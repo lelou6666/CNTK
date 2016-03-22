@@ -108,12 +108,6 @@ StreamMinibatchPtr SequencePacker::PackStreamMinibatch(const std::vector<Sequenc
         m_streamBufferSizes[streamId] = totalNumberOfSamples;
     }
 
-    // Identify a stride for two adjecent sample of the same sequence.
-    // Note, sequences are packed coalesced
-    // (s11, s21, ... sN1 (here stride is finished) | s12, s22, ... sN2 (here stride is finished) | ...)
-    // to make sure efficient execution on GPU.
-    size_t stride = GetSampleSize(m_inputStreams[streamId]) * layout->GetNumParallelSequences();
-
     // Packing the actual data.
     StorageType storageType = m_inputStreams[streamId]->m_storageType;
     size_t elementSize = GetSizeByType(m_inputStreams[streamId]->m_elementType);
@@ -127,7 +121,7 @@ StreamMinibatchPtr SequencePacker::PackStreamMinibatch(const std::vector<Sequenc
         // Packing the sequence
         for (size_t sampleIndex = 0; sampleIndex < sequence.GetNumTimeSteps(); ++sampleIndex)
         {
-            char* destination = m_streamBuffers[streamId].get() + layout->GetColumnIndex(sequence, sampleIndex) * stride + sequence.s * sampleSize;
+            char* destination = m_streamBuffers[streamId].get() + layout->GetColumnIndex(sequence, sampleIndex) * sampleSize;
             if (storageType == StorageType::dense)
             {
                 PackDenseSample(destination, data, sampleIndex, elementSize, sampleSize);

@@ -164,6 +164,7 @@ ChunkDescriptions HTKDataDeserializer::GetChunkDescriptions()
         auto cd = make_shared<ChunkDescription>();
         cd->m_id = i;
         cd->m_numberOfSamples = m_chunks[i].GetTotalFrames();
+        // In frame mode, each frame is represented as sequence.
         cd->m_numberOfSequences = m_frameMode ? m_chunks[i].GetTotalFrames() : m_chunks[i].GetNumberOfUtterances();
         chunks.push_back(cd);
     }
@@ -184,7 +185,7 @@ void HTKDataDeserializer::GetSequencesForChunk(size_t chunkId, vector<SequenceDe
 
         if (m_frameMode)
         {
-            // Because it is a frame mode, creating sequences for each frame.
+            // Because it is a frame mode, creating a sequence for each frame.
             for (size_t k = 0; k < utterance->GetNumberOfFrames(); ++k)
             {
                 SequenceDescription f;
@@ -199,6 +200,7 @@ void HTKDataDeserializer::GetSequencesForChunk(size_t chunkId, vector<SequenceDe
         }
         else
         {
+            // Creating sequence description per utterance.
             SequenceDescription f;
             f.m_chunkId = chunkId;
             f.m_key.m_major = major;
@@ -286,65 +288,71 @@ ChunkPtr HTKDataDeserializer::GetChunk(size_t chunkId)
     return chunk;
 };
 
-// Store all features without padding.
+// A matrix to store all features for the utterance without padding (differently from ssematrix).
 class FeatureMatrix
 {
-    std::vector<float> m_data;
-    size_t m_rows;
-    size_t m_columns;
-
 public:
     FeatureMatrix(size_t rows, size_t columns) : m_rows(rows), m_columns(columns)
     {
         m_data.resize(rows * columns);
     }
 
+    // Returns a reference to the column.
     inline array_ref<float> col(size_t column)
     {
         return array_ref<float>(m_data.data() + m_rows * column, m_rows);
     }
 
+    // Gets pointer to the data.
     inline float* GetData()
     {
         return m_data.data();
     }
 
+    // Gets number of columns.
     inline size_t GetNumberOfColumns() const
     {
         return m_columns;
     }
 
+    // Gets total size in elements of stored features.
     inline size_t GetTotalSize() const
     {
         return m_data.size();
     }
+
+private:
+    // Features
+    std::vector<float> m_data;
+    // Number of rows = dimension of the feature
+    size_t m_rows;
+    // Number of columns = number of samples in utterance.
+    size_t m_columns;
 };
 
-// This class stores sequence data for HTK,
-//     - for floats: a simple pointer to the chunk data
-//     - for doubles: allocated array of doubles which is freed when the sequence is no longer used.
-struct HTKSequenceData : DenseSequenceData
+// This class stores sequence data for HTK for floats.
+struct HTKFloatSequenceData : DenseSequenceData
 {
     FeatureMatrix m_buffer;
 
-    HTKSequenceData(size_t dimension, size_t numberOfSamples) : m_buffer(dimension, numberOfSamples)
+    HTKFloatSequenceData(FeatureMatrix&& data) : m_buffer(data)
     {
+        m_numberOfSamples = data.GetNumberOfColumns();
         m_data = m_buffer.GetData();
-        m_numberOfSamples = numberOfSamples;
-    }
-
-    ~HTKSequenceData()
-    {
-        // Checking if m_data just a pointer in to the 
-        if (m_data != m_buffer.GetData())
-        {
-            delete[] reinterpret_cast<double*>(m_data);
-            m_data = nullptr;
-        }
     }
 };
 
-typedef shared_ptr<HTKSequenceData> HTKSequenceDataPtr;
+// This class stores sequence data for HTK for doubles.
+struct HTKDoubleSequenceData : DenseSequenceData
+{
+    std::vector<double> m_buffer;
+
+    HTKDoubleSequenceData(FeatureMatrix& data) : m_buffer(data.GetData(), data.GetData() + data.GetTotalSize())
+    {
+        m_numberOfSamples = data.GetNumberOfColumns();
+        m_data = m_buffer.data();
+    }
+};
 
 // Get a sequence by its chunk id and id.
 void HTKDataDeserializer::GetSequenceById(size_t chunkId, size_t id, vector<SequenceDataPtr>& r)
@@ -360,57 +368,40 @@ void HTKDataDeserializer::GetSequenceById(size_t chunkId, size_t id, vector<Sequ
     size_t leftExtent = m_augmentationWindow.first;
     size_t rightExtent = m_augmentationWindow.second;
 
-    // page in the needed range of frames
+    // identify the the needed range of frames
     if (leftExtent == 0 && rightExtent == 0)
     {
         leftExtent = rightExtent = msra::dbn::augmentationextent(utteranceFramesWrapper[0].size(), m_dimension);
     }
 
-    HTKSequenceDataPtr result;
-    const vector<char> noBoundaryFlags; // TODO: dummy, currently to boundaries supported.
+    const vector<char> noBoundaryFlags; // dummy, currently to boundaries supported.
+    FeatureMatrix features(m_dimension, m_frameMode ? 1 : utterance->GetNumberOfFrames());
     if (m_frameMode)
     {
-        result = make_shared<HTKSequenceData>(m_dimension, 1);
-
+        // For frame mode augment a single frame.
         size_t frameIndex = id - utterance->GetStartFrameIndexInsideChunk();
-        msra::dbn::augmentneighbors(utteranceFramesWrapper, noBoundaryFlags, frameIndex, leftExtent, rightExtent, result->m_buffer, 0);
-
-        // Have to copy to a double buffer.
-        if (m_elementType == ElementType::tdouble)
-        {
-            assert(m_elementType == ElementType::tdouble);
-            double *doubleBuffer = new double[m_dimension];
-            const float *floatBuffer = result->m_buffer.GetData();
-
-            for (size_t i = 0; i < m_dimension; i++)
-            {
-                doubleBuffer[i] = floatBuffer[i];
-            }
-
-            result->m_data = doubleBuffer;
-        }
+        msra::dbn::augmentneighbors(utteranceFramesWrapper, noBoundaryFlags, frameIndex, leftExtent, rightExtent, features, 0);
     }
     else
     {
-        result = make_shared<HTKSequenceData>(m_dimension, utterance->GetNumberOfFrames());
-
+        // Augment complete utterance.
         for (size_t frameIndex = 0; frameIndex < utterance->GetNumberOfFrames(); ++frameIndex)
         {
-            msra::dbn::augmentneighbors(utteranceFramesWrapper, noBoundaryFlags, frameIndex, leftExtent, rightExtent, result->m_buffer, frameIndex);
-        }
-
-        // Have to copy to a double buffer.
-        if (m_elementType == ElementType::tdouble)
-        {
-            double *doubleBuffer = new double[m_dimension * result->m_numberOfSamples];
-            for (size_t i = 0; i < result->m_buffer.GetTotalSize(); ++i)
-            {
-                doubleBuffer[i] = *(result->m_buffer.GetData() + i);
-            }
-            result->m_data = doubleBuffer;
+            msra::dbn::augmentneighbors(utteranceFramesWrapper, noBoundaryFlags, frameIndex, leftExtent, rightExtent, features, frameIndex);
         }
     }
 
+    // Copy features to the sequence depending on the type.
+    DenseSequenceDataPtr result;
+    if (m_elementType == ElementType::tdouble)
+    {
+        result = make_shared<HTKDoubleSequenceData>(features);
+    }
+    else
+    {
+        assert(m_elementType == ElementType::tfloat);
+        result = make_shared<HTKFloatSequenceData>(std::move(features));
+    }
     r.push_back(result);
 }
 

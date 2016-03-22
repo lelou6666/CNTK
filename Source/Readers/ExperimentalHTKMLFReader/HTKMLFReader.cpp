@@ -116,6 +116,8 @@ void HTKMLFReader::StartEpoch(const EpochConfiguration& config)
     }
 
     m_randomizer->StartEpoch(config);
+
+    // TODO: should we unify both packers into a single one?
     if (m_frameMode)
     {
         m_packer = std::make_shared<SampleModePacker>(

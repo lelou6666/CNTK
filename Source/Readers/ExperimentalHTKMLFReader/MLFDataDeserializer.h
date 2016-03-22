@@ -70,8 +70,6 @@ private:
     std::vector<SparseSequenceDataPtr> m_categories;
 
     bool m_frameMode;
-
-    CorpusDescriptorPtr m_corpus;
 };
 
 }}}

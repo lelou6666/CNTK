@@ -26,22 +26,39 @@ public:
 
 private:
     // Auxiliary packing functions.
+    // Packs sequences from a paritcular stream into a minibatch.
     StreamMinibatchPtr PackStreamMinibatch(const std::vector<SequenceDataPtr>& sequences, size_t streamId);
+
+    // Packs sparse sample as dense into the destination.
     void PackSparseSample(void* destination, SequenceDataPtr sequence, size_t sample, size_t elementSize, size_t sampleSize);
+
+    // Packs dense sample into the desitination.
     void PackDenseSample(void* destination, SequenceDataPtr sequence, size_t sample, size_t elementSize, size_t sampleSize);
 
     // Utility functions.
+    // Allocates the buffer.
+    // TODO: Should use pinned memory.
     std::shared_ptr<char> AllocateBuffer(size_t numElements, size_t elementSize);
+
+    // Gets a sample size in bytes for a stream.
     size_t GetSampleSize(StreamDescriptionPtr stream);
 
+    // Memory provider.
+    // TODO: Should possibly switch to matrices here.
     MemoryProviderPtr m_memoryProvider;
     TransformerPtr m_transformer;
+
+    // Input streams provided by the transformer.
     std::vector<StreamDescriptionPtr> m_outputStreams;
+    // Output streams expected by the network.
     std::vector<StreamDescriptionPtr> m_inputStreams;
+
+    // Minibatch size in samples.
     size_t m_minibatchSize;
 
     // Buffers for allocated data.
     std::vector<std::shared_ptr<char>> m_streamBuffers;
+    // Size of allocated buffers, m_streamBuffers.size() == m_streamBufferSizes.size().
     std::vector<size_t> m_streamBufferSizes;
 };
 

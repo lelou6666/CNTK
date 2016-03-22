@@ -47,7 +47,7 @@ private:
     // TODO: Randomizer won't implement transformer interface in the near future.
     TransformerPtr m_randomizer;
 
-    // Is in frame mode.
+    // Indicates whether the reader operates in frame mode.
     bool m_frameMode;
 };
 

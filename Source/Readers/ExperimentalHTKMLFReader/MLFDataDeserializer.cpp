@@ -38,7 +38,6 @@ struct MLFUtterance : SequenceDescription
 };
 
 MLFDataDeserializer::MLFDataDeserializer(CorpusDescriptorPtr corpus, const ConfigParameters& labelConfig, const std::wstring& name)
-    : m_corpus(corpus)
 {
     m_frameMode = labelConfig.Find("frameMode", "true");
 
@@ -186,6 +185,7 @@ void MLFDataDeserializer::GetSequencesForChunk(size_t, std::vector<SequenceDescr
     result.reserve(m_frames.size());
     if (m_frameMode)
     {
+        // Because it is a frame mode, creating a sequence for each frame.
         for (size_t i = 0; i < m_frames.size(); ++i)
         {
             SequenceDescription f;
@@ -200,6 +200,7 @@ void MLFDataDeserializer::GetSequencesForChunk(size_t, std::vector<SequenceDescr
     }
     else
     {
+        // Creating sequence description per utterance.
         for (size_t i = 0; i < m_utteranceIndex.size() - 1; ++i)
         {
             SequenceDescription f;
@@ -221,6 +222,7 @@ ChunkPtr MLFDataDeserializer::GetChunk(size_t chunkId)
     return std::make_shared<MLFChunk>(this);
 }
 
+// Sparse labels for an utterance.
 template <class ElemType>
 struct MLFSequenceData : SparseSequenceData
 {
@@ -244,6 +246,7 @@ void MLFDataDeserializer::GetSequenceById(size_t sequenceId, std::vector<Sequenc
     }
     else
     {
+        // Packing labels for the utterance into sparse sequence.
         size_t numberOfSamples = m_utteranceIndex[sequenceId + 1] - m_utteranceIndex[sequenceId];
         SparseSequenceDataPtr s;
         if (m_elementType == ElementType::tfloat)

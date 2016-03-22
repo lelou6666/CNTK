@@ -66,7 +66,7 @@ private:
     // Total number of frames.
     size_t m_totalNumberOfFrames;
 
-    // Flags, whether single frames should be exposed as sequences.
+    // Flags, whether single speech frames should be exposed as sequences.
     bool m_frameMode;
 
     // Auxiliary data for checking against the data in the feature file.

@@ -22,6 +22,8 @@ SequencePacker::SequencePacker(
 {
     m_inputStreams = m_transformer->GetStreamDescriptions();
     assert(m_inputStreams.size() == m_outputStreams.size());
+    // Currently do not support sparse output.
+    // TODO: Will be supported in the future.
     assert(
         std::find_if(
         m_outputStreams.begin(),
@@ -37,7 +39,7 @@ SequencePacker::SequencePacker(
         const auto& stream = m_outputStreams[i];
         UNUSED(stream);
 
-        // Input and output should match in everything except for sparse/dense.
+        // Input and output should match in everything except for sparse/dense storage type.
         assert(stream->m_elementType == ElementType::tfloat || stream->m_elementType == ElementType::tdouble);
         assert(stream->m_name == m_inputStreams[i]->m_name);
         assert(stream->m_id == m_inputStreams[i]->m_id);
@@ -48,8 +50,10 @@ SequencePacker::SequencePacker(
     }
 }
 
+// Reading minibatch.
 Minibatch SequencePacker::ReadMinibatch()
 {
+    assert(m_streamBufferSizes.size() == m_streamBuffers.size());
     auto sequences = m_transformer->GetNextSequences(m_minibatchSize);
 
     Minibatch minibatch(sequences.m_endOfEpoch);
@@ -58,6 +62,7 @@ Minibatch SequencePacker::ReadMinibatch()
         return minibatch;
     }
 
+    // For each stream packing the minibatch.
     minibatch.m_data.reserve(sequences.m_data.size());
     for (size_t streamIndex = 0; streamIndex < sequences.m_data.size(); ++streamIndex)
     {
@@ -69,6 +74,8 @@ Minibatch SequencePacker::ReadMinibatch()
 
 StreamMinibatchPtr SequencePacker::PackStreamMinibatch(const std::vector<SequenceDataPtr>& sequences, size_t streamId)
 {
+    // Create sequence info for each sequences that we have got from the transformer.
+
     std::vector<MBLayout::SequenceInfo> inputSequences;
     for (size_t index = 0; index < sequences.size(); ++index)
     {
@@ -92,7 +99,7 @@ StreamMinibatchPtr SequencePacker::PackStreamMinibatch(const std::vector<Sequenc
     MBLayoutPtr layout = std::make_shared<MBLayout>();
     layout->InitAsPackedSequences(inputSequences, placement, rowAllocations);
 
-    // Allocating necessary buffer for the stream.
+    // Allocating necessary data buffer for the stream.
     size_t sampleSize = GetSampleSize(m_inputStreams[streamId]);
     size_t totalNumberOfSamples = layout->GetNumCols() * sampleSize;
     if (m_streamBufferSizes[streamId] < totalNumberOfSamples)
@@ -118,7 +125,6 @@ StreamMinibatchPtr SequencePacker::PackStreamMinibatch(const std::vector<Sequenc
         const auto& data = sequences[sequence.seqId];
 
         // Packing the sequence
-        // The resulting sequence should currently be dense!
         for (size_t sampleIndex = 0; sampleIndex < sequence.GetNumTimeSteps(); ++sampleIndex)
         {
             char* destination = m_streamBuffers[streamId].get() + layout->GetColumnIndex(sequence, sampleIndex) * stride + sequence.s * sampleSize;
@@ -141,6 +147,7 @@ StreamMinibatchPtr SequencePacker::PackStreamMinibatch(const std::vector<Sequenc
     return result;
 }
 
+// Packs a sparse sample as dense.
 void SequencePacker::PackSparseSample(void* destination, SequenceDataPtr sequence, size_t sample, size_t elementSize, size_t sampleSize)
 {
     // Setting buffer to 0.
@@ -157,6 +164,7 @@ void SequencePacker::PackSparseSample(void* destination, SequenceDataPtr sequenc
     }
 }
 
+// Packs a dense sample as dense.
 void SequencePacker::PackDenseSample(void* destination, SequenceDataPtr sequence, size_t sample, size_t /*elementSize*/, size_t sampleSize)
 {
     memcpy(destination, (char*)(sequence->m_data) + sample * sampleSize, sampleSize);

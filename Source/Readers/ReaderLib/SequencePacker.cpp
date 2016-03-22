@@ -11,30 +11,6 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-// Represents a sequence
-struct SequenceWrapper
-{
-    std::vector<SequenceDataPtr> m_dataPerStream;
-    size_t m_maxNumberOfSamples;
-
-    SequenceWrapper(const std::vector<SequenceDataPtr>& dataPerStream)
-        : m_dataPerStream(dataPerStream), m_maxNumberOfSamples(0)
-    {
-        for (size_t i = 0; i < m_dataPerStream.size(); ++i)
-        {
-            if (m_dataPerStream[i]->m_numberOfSamples > m_maxNumberOfSamples)
-            {
-                m_maxNumberOfSamples = m_dataPerStream[i]->m_numberOfSamples;
-            }
-        }
-    }
-
-    size_t GetMaxNumberOfSamples() const
-    {
-        return m_maxNumberOfSamples;
-    }
-};
-
 SequencePacker::SequencePacker(
     MemoryProviderPtr memoryProvider,
     TransformerPtr transformer,
@@ -72,185 +48,104 @@ SequencePacker::SequencePacker(
     }
 }
 
-bool SequencePacker::GetNextSequence(SequenceWrapperPtr& sequence)
-{
-    // We always need only a single sequence
-    auto s = m_transformer->GetNextSequences(1);
-    while (s.m_data.empty() && !s.m_endOfEpoch)
-    {
-        s = m_transformer->GetNextSequences(1);
-    }
-
-    // End of epoch, simply return.
-    if (s.m_data.empty())
-    {
-        return true;
-    }
-
-    std::vector<SequenceDataPtr> data;
-    for (size_t i = 0; i < s.m_data.size(); ++i)
-    {
-        // expect only single sequence
-        data.push_back(s.m_data[i][0]);
-    }
-
-    sequence = std::make_shared<SequenceWrapper>(data);
-    return false;
-}
-
 Minibatch SequencePacker::ReadMinibatch()
 {
-    size_t sequenceCount = 0;
-    m_preparedSequences.clear();
+    auto sequences = m_transformer->GetNextSequences(m_minibatchSize);
 
-    // Check if there is some data left from the previous read.
-    if (m_currentSequence != nullptr)
+    Minibatch minibatch(sequences.m_endOfEpoch);
+    if (sequences.m_data.empty())
     {
-        m_preparedSequences.push_back(std::vector<SequenceWrapperPtr> { m_currentSequence });
-        m_currentSequence = nullptr;
-        sequenceCount++;
+        return minibatch;
     }
 
-    // Filling in initial set of m_parallelNumberOfSequences sequences.
-    bool endOfEpoch = false;
-    while (sequenceCount < m_parallelNumberOfSequences)
+    minibatch.m_data.reserve(sequences.m_data.size());
+    for (size_t streamIndex = 0; streamIndex < sequences.m_data.size(); ++streamIndex)
     {
-        endOfEpoch = GetNextSequence(m_currentSequence);
-        if (endOfEpoch)
-        {
-            break;
-        }
-        m_preparedSequences.push_back(std::vector<SequenceWrapperPtr> { m_currentSequence });
-        sequenceCount++;
-        m_currentSequence = nullptr;
+        minibatch.m_data.push_back(PackStreamMinibatch(sequences.m_data[streamIndex], streamIndex));
     }
 
-    assert(m_preparedSequences.size() == m_parallelNumberOfSequences || endOfEpoch && m_preparedSequences.size() <= m_parallelNumberOfSequences);
-
-    // Ok we have got our m_parallelNumberOfSequences.
-    // Let's find the longest.
-    m_maxLength = 0;
-    for (int i = 0; i < m_preparedSequences.size(); ++i)
-    {
-        if (m_preparedSequences[i].front()->GetMaxNumberOfSamples() > m_maxLength)
-        {
-            m_maxLength = m_preparedSequences[i].front()->GetMaxNumberOfSamples();
-        }
-    }
-
-    // Now maxLength defines the longest possible sequence
-    // Let's see whether other sequences can be packed as well.
-    std::vector<int> freeSlots(m_preparedSequences.size(), (int)m_maxLength);
-    for (int i = 0; i < m_preparedSequences.size(); ++i)
-    {
-        freeSlots[i] -= (int)m_preparedSequences[i].front()->GetMaxNumberOfSamples();
-    }
-
-    // Ok, we identified how many free slots exists per row.
-    // Let's fill them in with other sequences.
-    bool freeSpaceExists = true;
-    endOfEpoch = GetNextSequence(m_currentSequence);
-    while (freeSpaceExists && !endOfEpoch)
-    {
-        freeSpaceExists = false;
-        for (int i = 0; i < freeSlots.size(); ++i)
-        {
-            if (freeSlots[i] - (int)m_currentSequence->GetMaxNumberOfSamples() >= 0)
-            {
-                freeSpaceExists = true;
-                m_preparedSequences[i].push_back(m_currentSequence);
-                freeSlots[i] -= (int)m_currentSequence->GetMaxNumberOfSamples();
-                break;
-            }
-        }
-
-        if (!freeSpaceExists)
-        {
-            break;
-        }
-
-        endOfEpoch = GetNextSequence(m_currentSequence);
-    }
-
-    // Finished. Now the matrix of prepared sequences has been build.
-    // Lets pack it in the format which can be consumed by GPU and create the corresponding MBLaoyuts.
-    return PackMinibatch(m_preparedSequences, endOfEpoch);
+    return minibatch;
 }
 
-Minibatch SequencePacker::PackMinibatch(const std::vector<std::vector<SequenceWrapperPtr>>& m_preparedSequences, bool endOfEpoch)
+StreamMinibatchPtr SequencePacker::PackStreamMinibatch(const std::vector<SequenceDataPtr>& sequences, size_t streamId)
 {
-    // Ok, we have all our sequences in order how they have to be packed:
-    // Vector of m_parallelNumberOfSequences, in each element is another
-    // vector that actually contains sequences not exceeding the max width.
-    // Now let's pack them into contigues memory per stream.
-    Minibatch result;
-    result.m_endOfEpoch = endOfEpoch;
-    if (m_preparedSequences.empty())
+    std::vector<MBLayout::SequenceInfo> inputSequences;
+    for (size_t index = 0; index < sequences.size(); ++index)
     {
-        return result;
+        MBLayout::SequenceInfo info;
+
+        // In each minibatch sequence ids should be unique.
+        // They have to match between different input streams in the same minibatch.
+        // We are using sequence index in the set of received sequences.
+        // TODO: should we use m_key as sequence id and pass it with data?
+        info.seqId = index;
+
+        info.tBegin = 0;
+        info.tEnd = sequences[index]->m_numberOfSamples;
+        inputSequences.push_back(info);
     }
 
-    for (size_t i = 0; i < m_outputStreams.size(); ++i)
-    {
-        PackStreamMinibatch(i, m_preparedSequences);
-        MBLayoutPtr layout = CreateStreamMBLayout(i, m_preparedSequences);
+    std::vector<std::pair<size_t, size_t>> placement;
+    std::vector<size_t> rowAllocations;
 
-        StreamMinibatchPtr m = std::make_shared<StreamMinibatch>();
-        m->m_data = m_streamBuffers[i].get();
-        m->m_dataSize = m_streamBufferSizes[i] * GetSampleSize(m_outputStreams[i]);
-        m->m_layout = layout;
-        result.m_data.push_back(m);
+    // Creating the minibatch layout.
+    MBLayoutPtr layout = std::make_shared<MBLayout>();
+    layout->InitAsPackedSequences(inputSequences, placement, rowAllocations);
+
+    // Allocating necessary buffer for the stream.
+    size_t sampleSize = GetSampleSize(m_inputStreams[streamId]);
+    size_t totalNumberOfSamples = layout->GetNumCols() * sampleSize;
+    if (m_streamBufferSizes[streamId] < totalNumberOfSamples)
+    {
+        m_streamBuffers[streamId] = AllocateBuffer(layout->GetNumCols(), sampleSize);
+        m_streamBufferSizes[streamId] = totalNumberOfSamples;
     }
+
+    // Identify a stride for two adjecent sample of the same sequence.
+    // Note, sequences are packed coalesced
+    // (s11, s21, ... sN1 (here stride is finished) | s12, s22, ... sN2 (here stride is finished) | ...)
+    // to make sure efficient execution on GPU.
+    size_t stride = GetSampleSize(m_inputStreams[streamId]) * layout->GetNumParallelSequences();
+
+    // Packing the actual data.
+    StorageType storageType = m_inputStreams[streamId]->m_storageType;
+    size_t elementSize = GetSizeByType(m_inputStreams[streamId]->m_elementType);
+    const auto& packedSequences = layout->GetAllSequences();
+    for (const auto& sequence : packedSequences)
+    {
+        if (sequence.seqId == GAP_SEQUENCE_ID)
+            continue;
+        const auto& data = sequences[sequence.seqId];
+
+        // Packing the sequence
+        // The resulting sequence should currently be dense!
+        for (size_t sampleIndex = 0; sampleIndex < sequence.GetNumTimeSteps(); ++sampleIndex)
+        {
+            char* destination = m_streamBuffers[streamId].get() + layout->GetColumnIndex(sequence, sampleIndex) * stride + sequence.s * sampleSize;
+            if (storageType == StorageType::dense)
+            {
+                PackDenseSample(destination, data, sampleIndex, elementSize, sampleSize);
+            }
+            else // sparse
+            {
+                PackSparseSample(destination, data, sampleIndex, elementSize, sampleSize);
+            }
+        }
+    }
+
+    // Ok, minibatch is ready, give it out.
+    StreamMinibatchPtr result = std::make_shared<StreamMinibatch>();
+    result->m_data = m_streamBuffers[streamId].get();
+    result->m_dataSize = m_streamBufferSizes[streamId] * GetSampleSize(m_outputStreams[streamId]);
+    result->m_layout = layout;
     return result;
 }
 
-void SequencePacker::PackStreamMinibatch(size_t streamId, const std::vector<std::vector<SequenceWrapperPtr>>& preparedSequences)
+void SequencePacker::PackSparseSample(void* destination, SequenceDataPtr sequence, size_t sample, size_t elementSize, size_t sampleSize)
 {
-    size_t sampleSize = GetSampleSize(m_outputStreams[streamId]);
-    size_t elementSize = GetSizeByType(m_outputStreams[streamId]->m_elementType);
-    StorageType storageType = m_inputStreams[streamId]->m_storageType;
+    // Setting buffer to 0.
+    memset(destination, 0, sampleSize);
 
-    // Get total size of sequences in the stream. Maybe bigger than required.
-    size_t totalNumberOfSamplesInStream = preparedSequences.size() * m_maxLength;
-    if (totalNumberOfSamplesInStream > m_streamBufferSizes[streamId])
-    {
-        m_streamBuffers[streamId] = AllocateBuffer(totalNumberOfSamplesInStream, sampleSize);
-        m_streamBufferSizes[streamId] = totalNumberOfSamplesInStream;
-    }
-
-    // Fill everything with zeros.
-    memset(m_streamBuffers[streamId].get(), 0, totalNumberOfSamplesInStream * sampleSize);
-
-    // Identify a stride for a single column.
-    size_t stride = sampleSize * preparedSequences.size();
-
-    // Filling up the rows.
-    for (int i = 0; i < preparedSequences.size(); ++i)
-    {
-        size_t columnIndex = 0;
-        for (int j = 0; j < preparedSequences[i].size(); ++j)
-        {
-            auto sequence = preparedSequences[i][j]->m_dataPerStream[streamId];
-            for (int k = 0; k < sequence->m_numberOfSamples; ++k)
-            {
-                char* destination = m_streamBuffers[streamId].get() + columnIndex * stride + i * sampleSize;
-                if (storageType == StorageType::dense)
-                {
-                    PackDenseSample(destination, sequence, k, elementSize, sampleSize);
-                }
-                else // sparse
-                {
-                    PackSparseSample(destination, sequence, k, elementSize, sampleSize);
-                }
-
-                columnIndex++;
-            }
-        }
-    }
-}
-
-void SequencePacker::PackSparseSample(void* destination, SequenceDataPtr sequence, size_t sample, size_t elementSize, size_t /*sampleSize*/)
-{
     SparseSequenceDataPtr s = static_pointer_cast<SparseSequenceData>(sequence);
     size_t nonZeroCount = s->m_indices[sample].size();
     for (size_t nonZeroIndex = 0; nonZeroIndex < nonZeroCount; ++nonZeroIndex)
@@ -265,36 +160,6 @@ void SequencePacker::PackSparseSample(void* destination, SequenceDataPtr sequenc
 void SequencePacker::PackDenseSample(void* destination, SequenceDataPtr sequence, size_t sample, size_t /*elementSize*/, size_t sampleSize)
 {
     memcpy(destination, (char*)(sequence->m_data) + sample * sampleSize, sampleSize);
-}
-
-MBLayoutPtr SequencePacker::CreateStreamMBLayout(size_t streamId, const std::vector<std::vector<SequenceWrapperPtr>>& preparedSequences)
-{
-    // TODO: This should simply call InitAsPackedSequences, but his breaks tests right now.
-    // TODO: Firstly we pass the tests, then we change this particular logic.
-
-    MBLayoutPtr minibatchLayout = std::make_shared<MBLayout>();
-    minibatchLayout->Init(preparedSequences.size(), m_maxLength);
-
-    for (int i = 0; i < m_preparedSequences.size(); ++i)
-    {
-        size_t begin = 0;
-        size_t end = 0;
-        // Fill sequences
-        for (int j = 0; j < m_preparedSequences[i].size(); ++j)
-        {
-            end = begin + m_preparedSequences[i][j]->m_dataPerStream[streamId]->m_numberOfSamples;
-            minibatchLayout->AddSequence(NEW_SEQUENCE_ID, i, begin, end);
-            begin = end;
-        }
-
-        // Fill gaps
-        if (end != m_maxLength)
-        {
-            minibatchLayout->AddGap(i, end, m_maxLength);
-        }
-    }
-
-    return minibatchLayout;
 }
 
 size_t SequencePacker::GetSampleSize(StreamDescriptionPtr stream)
@@ -314,6 +179,4 @@ std::shared_ptr<char> SequencePacker::AllocateBuffer(size_t numElements, size_t 
     });
 }
 
-}
-}
-}
+}}}

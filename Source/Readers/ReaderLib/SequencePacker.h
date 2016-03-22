@@ -12,11 +12,7 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-// Represents a sequence
-struct SequenceWrapper;
-typedef std::shared_ptr<SequenceWrapper> SequenceWrapperPtr;
-
-// A sequence packer that densly packs samples in parallel for GPU consumptions.
+// A sequence packer that packs dense or sparse samples in dense minibatch for parallel GPU consumption.
 class SequencePacker : public Packer
 {
 public:
@@ -29,38 +25,22 @@ public:
     virtual Minibatch ReadMinibatch() override;
 
 private:
-    std::shared_ptr<char> AllocateBuffer(size_t numElements, size_t elementSize);
-    size_t GetSampleSize(StreamDescriptionPtr stream);
-    bool GetNextSequence(SequenceWrapperPtr& sequence);
-    MBLayoutPtr CreateStreamMBLayout(size_t streamId, const std::vector<std::vector<SequenceWrapperPtr>>& preparedSequences);
-    Minibatch PackMinibatch(const std::vector<std::vector<SequenceWrapperPtr>>& m_preparedSequences, bool endOfEpoch);
-    void PackStreamMinibatch(size_t streamId, const std::vector<std::vector<SequenceWrapperPtr>>& preparedSequences);
+    // Auxiliary packing functions.
+    StreamMinibatchPtr PackStreamMinibatch(const std::vector<SequenceDataPtr>& sequences, size_t streamId);
     void PackSparseSample(void* destination, SequenceDataPtr sequence, size_t sample, size_t elementSize, size_t sampleSize);
     void PackDenseSample(void* destination, SequenceDataPtr sequence, size_t sample, size_t elementSize, size_t sampleSize);
+
+    // Utility functions.
+    std::shared_ptr<char> AllocateBuffer(size_t numElements, size_t elementSize);
+    size_t GetSampleSize(StreamDescriptionPtr stream);
 
     MemoryProviderPtr m_memoryProvider;
     TransformerPtr m_transformer;
     std::vector<StreamDescriptionPtr> m_outputStreams;
     std::vector<StreamDescriptionPtr> m_inputStreams;
-
     size_t m_minibatchSize;
-    size_t m_parallelNumberOfSequences;
 
-    SequenceWrapperPtr m_currentSequence;
-
-    // A matrix of prepared sequences. The number of rows(RN) = m_parallelNumberOfSequences,
-    // in each row we try to fit as many sequences as possible, not exceeding
-    // the m_maxLength of samples. m_maxLength is defined as the max length between the first m_parallelNumberOfSequences sequences.
-    // It looks something like that:
-    //  /***s11***/ /***s12**/
-    //  ....
-    //  /**********sM1*********/   <-- MaxSize equals its length, because sM1 was the longest among [s11 ... sRN1]
-    //  ....
-    // /*sRN1*//*sRN2*//*sRN2*/
-    // This logic of packing is implemented to support current tests.
-    std::vector<std::vector<SequenceWrapperPtr>> m_preparedSequences;
-    size_t m_maxLength;
-
+    // Buffers for allocated data.
     std::vector<std::shared_ptr<char>> m_streamBuffers;
     std::vector<size_t> m_streamBufferSizes;
 };

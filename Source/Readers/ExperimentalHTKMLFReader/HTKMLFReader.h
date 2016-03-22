@@ -49,9 +49,6 @@ private:
 
     // Is in frame mode.
     bool m_frameMode;
-
-    // Legacy. Number of parallel sequences per minibatch for all epochs.
-    intargvector m_numberOfParallelSequencesPerMinibatch;
 };
 
 }}}

@@ -11,7 +11,7 @@
 #include "ConfigHelper.h"
 #include "Bundler.h"
 #include "StringUtil.h"
-#include "SequenceModePacker.h"
+#include "SequencePacker.h"
 #include "SampleModePacker.h"
 #include "BlockRandomizer.h"
 #include "NoRandomizer.h"
@@ -100,9 +100,6 @@ HTKMLFReader::HTKMLFReader(MemoryProviderPtr provider,
             m_streams.push_back(stream);
         }
     }
-
-    // Needed for legacy packing.
-    m_numberOfParallelSequencesPerMinibatch = readerConfig(L"nbruttsineachrecurrentiter", ConfigParameters::Array(intargvector(vector<int> { 1 })));
 }
 
 std::vector<StreamDescriptionPtr> HTKMLFReader::GetStreamDescriptions()
@@ -129,12 +126,10 @@ void HTKMLFReader::StartEpoch(const EpochConfiguration& config)
     }
     else
     {
-        // Currently legacy.
-        m_packer = std::make_shared<SequenceModePacker>(
+        m_packer = std::make_shared<SequencePacker>(
             m_provider,
             m_randomizer,
             config.m_minibatchSizeInSamples,
-            m_numberOfParallelSequencesPerMinibatch[config.m_epochIndex],
             m_streams);
     }
 }

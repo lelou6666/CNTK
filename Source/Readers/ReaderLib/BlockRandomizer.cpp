@@ -59,11 +59,11 @@ void BlockRandomizer::StartEpoch(const EpochConfiguration& config)
         m_epochSize = config.m_totalEpochSizeInSamples;
     }
 
-    // Calculates global sample position.
+    // Calculates starts of the epoch, prepares a new sweep if needed.
     m_epochStartPosition = m_epochSize * config.m_epochIndex;
     PrepareNewSweepIfNeeded(m_epochStartPosition);
 
-    // Sets sequence cursor to the sequence that corresponds to the global sample position.
+    // Sets sequence cursor to the sequence that corresponds to the epoch start position.
     // If last epoch ended in the middle of a sequence, the cursor is moved to the next sequence in the sweep.
     size_t offsetInSweep = m_epochStartPosition % m_sweepTotalNumberOfSamples;
     size_t newOffset = m_sequenceRandomizer->SetSequencePositionTo(offsetInSweep, m_sweep);
@@ -155,11 +155,7 @@ bool BlockRandomizer::GetNextSequenceDescriptions(size_t sampleCount, std::vecto
     assert(sampleCount != 0);
 
     // Check that we do not go over the sweep.
-    size_t sweepPosition = m_globalSamplePosition % m_sweepTotalNumberOfSamples;
-    if (sweepPosition + sampleCount >= m_sweepTotalNumberOfSamples)
-    {
-        sampleCount = (long)(m_sweepTotalNumberOfSamples - sweepPosition);
-    }
+    sampleCount = std::min(sampleCount, (long)m_sweepTotalNumberOfSamples - m_globalSamplePosition % m_sweepTotalNumberOfSamples);
     assert(sampleCount != 0);
 
     // Randomizing sequences

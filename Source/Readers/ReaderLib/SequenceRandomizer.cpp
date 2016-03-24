@@ -228,7 +228,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     size_t SequenceRandomizer::SetSequencePositionTo(size_t offset, size_t sweep)
     {
         size_t chunkIdx = GetChunkIndexOf(offset);
-        if (!this->IsChunkInWindow(chunkIdx))
+        if (!IsChunkInWindow(chunkIdx))
         {
             Reset(sweep + 1);
             size_t count = offset;

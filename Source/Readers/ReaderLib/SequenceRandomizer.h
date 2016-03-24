@@ -38,9 +38,9 @@ public:
     // Resets current sequence sweep according to the seed.
     void Reset(size_t seed);
 
-    // Sets current sequence position to the sample offset.
-    // If offset is in the middle of the sequence, the sequence is alligned 
-    // and offset in the sweep where the sequence starts is returned.
+    // Sets current sequence position given the sample offset in a sweep.
+    // If the sample offset point in the middle of sequence, the position is moved to the sequence end,
+    // and a new sample offset is returned that points to the end of the sequence.
     size_t SetSequencePositionTo(size_t sweepSampleOffset, size_t sweep);
 
     // Gets next sequence descriptions.

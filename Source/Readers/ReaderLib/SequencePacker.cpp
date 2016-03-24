@@ -101,17 +101,18 @@ StreamMinibatchPtr SequencePacker::PackStreamMinibatch(const std::vector<Sequenc
 
     // Allocating necessary data buffer for the stream.
     size_t sampleSize = GetSampleSize(m_inputStreams[streamId]);
-    size_t totalNumberOfSamples = layout->GetNumCols() * sampleSize;
-    if (m_streamBufferSizes[streamId] < totalNumberOfSamples)
+    size_t totalNumberOfSamplesInBytes = layout->GetNumCols() * sampleSize;
+    if (m_streamBufferSizes[streamId] < totalNumberOfSamplesInBytes)
     {
         m_streamBuffers[streamId] = AllocateBuffer(layout->GetNumCols(), sampleSize);
-        m_streamBufferSizes[streamId] = totalNumberOfSamples;
+        m_streamBufferSizes[streamId] = totalNumberOfSamplesInBytes;
     }
 
     // Packing the actual data.
     StorageType storageType = m_inputStreams[streamId]->m_storageType;
     size_t elementSize = GetSizeByType(m_inputStreams[streamId]->m_elementType);
     const auto& packedSequences = layout->GetAllSequences();
+    char* streamBuffer = m_streamBuffers[streamId].get();
     for (const auto& sequence : packedSequences)
     {
         if (sequence.seqId == GAP_SEQUENCE_ID)
@@ -121,13 +122,14 @@ StreamMinibatchPtr SequencePacker::PackStreamMinibatch(const std::vector<Sequenc
         // Packing the sequence
         for (size_t sampleIndex = 0; sampleIndex < sequence.GetNumTimeSteps(); ++sampleIndex)
         {
-            char* destination = m_streamBuffers[streamId].get() + layout->GetColumnIndex(sequence, sampleIndex) * sampleSize;
+            char* destination = streamBuffer + layout->GetColumnIndex(sequence, sampleIndex) * sampleSize;
             if (storageType == StorageType::dense)
             {
                 PackDenseSample(destination, data, sampleIndex, elementSize, sampleSize);
             }
             else // sparse
             {
+                assert(storageType == StorageType::sparse_csc);
                 PackSparseSample(destination, data, sampleIndex, elementSize, sampleSize);
             }
         }
@@ -144,15 +146,19 @@ StreamMinibatchPtr SequencePacker::PackStreamMinibatch(const std::vector<Sequenc
 // Packs a sparse sample as dense.
 void SequencePacker::PackSparseSample(void* destination, SequenceDataPtr sequence, size_t sample, size_t elementSize, size_t sampleSize)
 {
-    // Setting buffer to 0.
+    // Because the sample is sparse firstly prepare the buffer and set everything to zero.
     memset(destination, 0, sampleSize);
 
     SparseSequenceDataPtr s = static_pointer_cast<SparseSequenceData>(sequence);
-    size_t nonZeroCount = s->m_indices[sample].size();
+    const auto& rowIndexes = s->m_indices[sample];
+    size_t nonZeroCount = rowIndexes.size();
+    // Iterate through non zero elements and copy them to the corresponding place using their index.
+    // Sample is a sparse vector encoded as csc: m_data points to the array of non zero elements,
+    // m_indices[sample] stores the non-zero row indexes for the sample.
     for (size_t nonZeroIndex = 0; nonZeroIndex < nonZeroCount; ++nonZeroIndex)
     {
         memcpy(
-            (char*)destination + s->m_indices[sample][nonZeroIndex] * elementSize,
+            (char*)destination + rowIndexes[nonZeroIndex] * elementSize,
             (const char*)(s->m_data) + nonZeroIndex * elementSize,
             elementSize);
     }
@@ -161,6 +167,7 @@ void SequencePacker::PackSparseSample(void* destination, SequenceDataPtr sequenc
 // Packs a dense sample as dense.
 void SequencePacker::PackDenseSample(void* destination, SequenceDataPtr sequence, size_t sample, size_t /*elementSize*/, size_t sampleSize)
 {
+    // Because the sample is dense - simply copying it to the output.
     memcpy(destination, (char*)(sequence->m_data) + sample * sampleSize, sampleSize);
 }
 

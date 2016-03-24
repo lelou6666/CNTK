@@ -117,7 +117,10 @@ void HTKMLFReader::StartEpoch(const EpochConfiguration& config)
 
     m_randomizer->StartEpoch(config);
 
-    // TODO: should we unify both packers into a single one?
+    // TODO: should we unify sample and sequence mode packers into a single one.
+    // TODO: functionally they are the same, the only difference is how we handle
+    // TODO: MBlayout and what is the perf hit for iterating/copying sequences.
+    // TODO: Should do more perf tests before unifying these two.
     if (m_frameMode)
     {
         m_packer = std::make_shared<SampleModePacker>(

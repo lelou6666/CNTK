@@ -248,15 +248,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
         size_t numberOfSamples = 0;
         size_t sequenceId = 0;
-        for (size_t i = 0; i < sequences.size(); ++i)
+        for (size_t i = 0; i < sequences.size() && numberOfSamples >= sampleOffsetInsideChunk; ++i)
         {
-            size_t sequenceSize = sequences[i].m_numberOfSamples;
-            if (numberOfSamples >= sampleOffsetInsideChunk)
-            {
-                break;
-            }
-
-            numberOfSamples += sequenceSize;
+            numberOfSamples += sequences[i].m_numberOfSamples;
             sequenceId++;
         }
 

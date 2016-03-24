@@ -253,8 +253,9 @@ void MLFDataDeserializer::GetSequenceById(size_t sequenceId, std::vector<Sequenc
         {
             s = std::make_shared<MLFSequenceData<float>>(numberOfSamples);
         }
-        else // double.
+        else
         {
+            assert(m_elementType == ElementType::tdouble);
             s = std::make_shared<MLFSequenceData<double>>(numberOfSamples);
         }
 

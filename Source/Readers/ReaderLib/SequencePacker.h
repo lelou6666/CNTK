@@ -26,13 +26,13 @@ public:
 
 private:
     // Auxiliary packing functions.
-    // Packs sequences from a paritcular stream into a minibatch.
+    // Packs sequences from a particular stream into a minibatch.
     StreamMinibatchPtr PackStreamMinibatch(const std::vector<SequenceDataPtr>& sequences, size_t streamId);
 
     // Packs sparse sample as dense into the destination.
     void PackSparseSample(void* destination, SequenceDataPtr sequence, size_t sample, size_t elementSize, size_t sampleSize);
 
-    // Packs dense sample into the desitination.
+    // Packs dense sample into the destination.
     void PackDenseSample(void* destination, SequenceDataPtr sequence, size_t sample, size_t elementSize, size_t sampleSize);
 
     // Utility functions.

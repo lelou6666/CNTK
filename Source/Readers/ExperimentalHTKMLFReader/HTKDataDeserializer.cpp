@@ -165,6 +165,7 @@ ChunkDescriptions HTKDataDeserializer::GetChunkDescriptions()
         cd->m_id = i;
         cd->m_numberOfSamples = m_chunks[i].GetTotalFrames();
         // In frame mode, each frame is represented as sequence.
+        // The augmentation is still done for frames in the same sequence only, please see GetSequenceById method.
         cd->m_numberOfSequences = m_frameMode ? m_chunks[i].GetTotalFrames() : m_chunks[i].GetNumberOfUtterances();
         chunks.push_back(cd);
     }
@@ -333,25 +334,27 @@ private:
 // This class stores sequence data for HTK for floats.
 struct HTKFloatSequenceData : DenseSequenceData
 {
-    FeatureMatrix m_buffer;
-
     HTKFloatSequenceData(FeatureMatrix&& data) : m_buffer(data)
     {
         m_numberOfSamples = data.GetNumberOfColumns();
         m_data = m_buffer.GetData();
     }
+
+private:
+    FeatureMatrix m_buffer;
 };
 
 // This class stores sequence data for HTK for doubles.
 struct HTKDoubleSequenceData : DenseSequenceData
 {
-    std::vector<double> m_buffer;
-
     HTKDoubleSequenceData(FeatureMatrix& data) : m_buffer(data.GetData(), data.GetData() + data.GetTotalSize())
     {
         m_numberOfSamples = data.GetNumberOfColumns();
         m_data = m_buffer.data();
     }
+
+private:
+    std::vector<double> m_buffer;
 };
 
 // Get a sequence by its chunk id and id.
@@ -368,13 +371,13 @@ void HTKDataDeserializer::GetSequenceById(size_t chunkId, size_t id, vector<Sequ
     size_t leftExtent = m_augmentationWindow.first;
     size_t rightExtent = m_augmentationWindow.second;
 
-    // identify the the needed range of frames
+    // identify the needed range of frames
     if (leftExtent == 0 && rightExtent == 0)
     {
         leftExtent = rightExtent = msra::dbn::augmentationextent(utteranceFramesWrapper[0].size(), m_dimension);
     }
 
-    const vector<char> noBoundaryFlags; // dummy, currently to boundaries supported.
+    const vector<char> noBoundaryFlags; // dummy, currently no boundaries supported.
     FeatureMatrix features(m_dimension, m_frameMode ? 1 : utterance->GetNumberOfFrames());
     if (m_frameMode)
     {

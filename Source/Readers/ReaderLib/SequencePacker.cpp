@@ -24,14 +24,18 @@ SequencePacker::SequencePacker(
     assert(m_inputStreams.size() == m_outputStreams.size());
     // Currently do not support sparse output.
     // TODO: Will be supported in the future.
-    assert(
-        std::find_if(
+    auto sparseOutput = std::find_if(
         m_outputStreams.begin(),
         m_outputStreams.end(),
         [](const StreamDescriptionPtr& s)
+        {
+            return s->m_storageType == StorageType::sparse_csc;
+        });
+
+    if (sparseOutput != m_outputStreams.end())
     {
-        return s->m_storageType == StorageType::sparse_csc;
-    }) == m_outputStreams.end());
+        RuntimeError("Sparse sequences are currently not supported.");
+    }
 
     assert(m_minibatchSize > 0);
     for (int i = 0; i < m_outputStreams.size(); ++i)

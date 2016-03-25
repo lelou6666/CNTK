@@ -379,10 +379,7 @@ LUSEQUENCEREADER_SRC =\
 	$(SOURCEDIR)/Readers/LUSequenceReader/DataWriterLocal.cpp \
 	$(SOURCEDIR)/Readers/LUSequenceReader/LUSequenceParser.cpp \
 	$(SOURCEDIR)/Readers/LUSequenceReader/LUSequenceReader.cpp \
-<<<<<<< HEAD
 	$(SOURCEDIR)/Readers/LUSequenceReader/LUSequenceWriter.cpp \
-=======
->>>>>>> Updated Makefile and samples.
 
 LUSEQUENCEREADER_OBJ := $(patsubst %.cpp, $(OBJDIR)/%.o, $(LUSEQUENCEREADER_SRC))
 

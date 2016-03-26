@@ -227,6 +227,8 @@ READER_SRC =\
 	$(SOURCEDIR)/Readers/ReaderLib/Bundler.cpp \
 	$(SOURCEDIR)/Readers/ReaderLib/NoRandomizer.cpp \
 	$(SOURCEDIR)/Readers/ReaderLib/ReaderShim.cpp \
+	$(SOURCEDIR)/Readers/ReaderLib/ChunkRandomizer.cpp \
+	$(SOURCEDIR)/Readers/ReaderLib/SequenceRandomizer.cpp \
 	$(SOURCEDIR)/Readers/ReaderLib/SampleModePacker.cpp \
 
 COMMON_SRC =\
@@ -375,6 +377,7 @@ LUSEQUENCEREADER_SRC =\
 	$(SOURCEDIR)/Readers/LUSequenceReader/DataWriterLocal.cpp \
 	$(SOURCEDIR)/Readers/LUSequenceReader/LUSequenceParser.cpp \
 	$(SOURCEDIR)/Readers/LUSequenceReader/LUSequenceReader.cpp \
+	$(SOURCEDIR)/Readers/LUSequenceReader/LUSequenceWriter.cpp \
 
 LUSEQUENCEREADER_OBJ := $(patsubst %.cpp, $(OBJDIR)/%.o, $(LUSEQUENCEREADER_SRC))
 
@@ -514,6 +517,28 @@ $(SPARSEPCREADER): $(SPARSEPCREADER_OBJ) | $(CNTKMATH_LIB)
 	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBDIR) $(LIBPATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ -l$(CNTKMATH)
 
 ########################################
+# CNTKTextFormatReader plugin
+########################################
+
+CNTKTEXTFORMATREADER_SRC =\
+	$(SOURCEDIR)/Readers/CNTKTextFormatReader/Exports.cpp \
+	$(SOURCEDIR)/Readers/CNTKTextFormatReader/Indexer.cpp \
+	$(SOURCEDIR)/Readers/CNTKTextFormatReader/TextParser.cpp \
+	$(SOURCEDIR)/Readers/CNTKTextFormatReader/CNTKTextFormatReader.cpp \
+	$(SOURCEDIR)/Readers/CNTKTextFormatReader/TextConfigHelper.cpp \
+
+CNTKTEXTFORMATREADER_OBJ := $(patsubst %.cpp, $(OBJDIR)/%.o, $(CNTKTEXTFORMATREADER_SRC))
+
+CNTKTEXTFORMATREADER:=$(LIBDIR)/CNTKTextFormatReader.so
+ALL += $(CNTKTEXTFORMATREADER)
+SRC+=$(CNTKTEXTFORMATREADER_SRC)
+
+$(CNTKTEXTFORMATREADER): $(CNTKTEXTFORMATREADER_OBJ) | $(CNTKMATH_LIB)
+	@echo $(SEPARATOR)
+	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBDIR) $(LIBPATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ -l$(CNTKMATH)
+
+
+########################################
 # Kaldi plugins
 ########################################
 
@@ -597,11 +622,9 @@ endif
 CNTK_SRC =\
 	$(SOURCEDIR)/CNTK/CNTK.cpp \
 	$(SOURCEDIR)/CNTK/ModelEditLanguage.cpp \
-	$(SOURCEDIR)/CNTK/NetworkDescriptionLanguage.cpp \
-	$(SOURCEDIR)/CNTK/SimpleNetworkBuilder.cpp \
-	$(SOURCEDIR)/CNTK/SynchronousExecutionEngine.cpp \
 	$(SOURCEDIR)/CNTK/tests.cpp \
 	$(SOURCEDIR)/ComputationNetworkLib/ComputationNode.cpp \
+	$(SOURCEDIR)/ComputationNetworkLib/ReshapingNodes.cpp \
 	$(SOURCEDIR)/ComputationNetworkLib/ComputationNetwork.cpp \
 	$(SOURCEDIR)/ComputationNetworkLib/ComputationNetworkEvaluation.cpp \
 	$(SOURCEDIR)/ComputationNetworkLib/ComputationNetworkAnalysis.cpp \
@@ -614,6 +637,10 @@ CNTK_SRC =\
 	$(SOURCEDIR)/ActionsLib/EvalActions.cpp \
 	$(SOURCEDIR)/ActionsLib/OtherActions.cpp \
 	$(SOURCEDIR)/ActionsLib/SpecialPurposeActions.cpp \
+    $(SOURCEDIR)/ActionsLib/NetworkFactory.cpp \
+	$(SOURCEDIR)/ActionsLib/NetworkDescriptionLanguage.cpp \
+	$(SOURCEDIR)/ActionsLib/SimpleNetworkBuilder.cpp \
+	$(SOURCEDIR)/ActionsLib/NDLNetworkBuilder.cpp \
 	$(SOURCEDIR)/SequenceTrainingLib/latticeforwardbackward.cpp \
 	$(SOURCEDIR)/SequenceTrainingLib/parallelforwardbackward.cpp \
 	$(SOURCEDIR)/CNTK/BrainScript/BrainScriptEvaluator.cpp \

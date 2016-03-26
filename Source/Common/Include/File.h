@@ -1,7 +1,6 @@
 //
-// <copyright file="File.h" company="Microsoft">
-//     Copyright (c) Microsoft Corporation.  All rights reserved.
-// </copyright>
+// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 //
 #pragma once
 
@@ -11,99 +10,102 @@
 #include <vector>
 #include <stdint.h>
 #ifdef _WIN32
-#include <Windows.h>
+#define NOMINMAX
+#include "Windows.h"
 #endif
 #ifdef __unix__
 #include <unistd.h>
 #endif
-#include "fileutil.h"   // for f{ge,pu}t{,Text}()
-#include <fstream>      // for LoadMatrixFromTextFile() --TODO: change to using this File class
+#include "fileutil.h" // for f{ge,pu}t{,Text}()
+#include <fstream>    // for LoadMatrixFromTextFile() --TODO: change to using this File class
 #include <sstream>
 
-namespace Microsoft{ namespace MSR { namespace CNTK {
+namespace Microsoft { namespace MSR { namespace CNTK {
 
 using namespace std;
 
 // file options, Type of textfile to use
 enum FileOptions
 {
-    fileOptionsNull = 0, // invalid value
-    fileOptionsBinary = 1,  // binary file
-    fileOptionsText = 2, // text based file, UTF-8
-    fileOptionsUnicode = 4,   // text based file, Unicode
-    fileOptionsType = fileOptionsBinary | fileOptionsText | fileOptionsUnicode, // file types
-    fileOptionsRead = 8,   // open in read mode
-    fileOptionsWrite = 16,  // open in write mode
-    fileOptionsSequential = 32,     // optimize for sequential reads (allocates big buffer)
-    fileOptionsReadWrite = fileOptionsRead | fileOptionsWrite, // read/write mode
+    fileOptionsNull = 0,                                        // invalid value
+    fileOptionsBinary = 1,                                      // binary file
+    fileOptionsText = 2,                                        // text based file, UTF-8
+    fileOptionsType = fileOptionsBinary | fileOptionsText,      // file types
+    fileOptionsRead = 8,                                        // open in read mode
+    fileOptionsWrite = 16,                                      // open in write mode
+    fileOptionsSequential = 32,                                 // optimize for sequential reads (allocates big buffer)
+    fileOptionsReadWrite = fileOptionsRead | fileOptionsWrite,  // read/write mode
 };
 
 // markers used for text files
 enum FileMarker
 {
-    fileMarkerNull = 0, // invalid value
-    fileMarkerBeginFile = 1, // begin of file marker
-    fileMarkerEndFile = 2, // end of file marker
-    fileMarkerBeginList = 3, // Beginning of list marker
+    fileMarkerNull = 0,          // invalid value
+    fileMarkerBeginFile = 1,     // begin of file marker
+    fileMarkerEndFile = 2,       // end of file marker
+    fileMarkerBeginList = 3,     // Beginning of list marker
     fileMarkerListSeparator = 4, // separate elements of a list
-    fileMarkerEndList = 5, // end of line/list marker
-    fileMarkerBeginSection = 6, // beginning of section
-    fileMarkerEndSection = 7, // end of section
+    fileMarkerEndList = 5,       // end of line/list marker
+    fileMarkerBeginSection = 6,  // beginning of section
+    fileMarkerEndSection = 7,    // end of section
 };
 
 // attempt a given operation (lambda) and retry multiple times
 // body - the lambda to retry, must be restartable
 
-template<typename FUNCTION> static void attempt(int retries, const FUNCTION & body)
+template <typename FUNCTION>
+static void attempt(int retries, const FUNCTION& body)
 {
-    for (int attempt = 1; ; attempt++)
+    for (int attempt = 1;; attempt++)
     {
         try
         {
             body();
-            if (attempt > 1) fprintf (stderr, "attempt: success after %d retries\n", attempt);
+            if (attempt > 1)
+                fprintf(stderr, "attempt: success after %d retries\n", attempt);
             break;
         }
-        catch (const std::exception & e)
+        catch (const std::exception& e)
         {
 #ifdef _WIN32
             void sleep(size_t ms);
 #endif
             if (attempt >= retries)
-                throw;      // failed N times --give up and rethrow the error
-            fprintf (stderr, "attempt: %s, retrying %d-th time out of %d...\n", e.what(), attempt+1, retries);
-            // wait a little, then try again
+                throw; // failed N times --give up and rethrow the error
+            fprintf(stderr, "attempt: %s, retrying %d-th time out of %d...\n", e.what(), attempt + 1, retries);
+// wait a little, then try again
 #ifdef _WIN32
             ::Sleep(1000);
-#else       // assuming __unix__
+#else // assuming __unix__
             ::sleep(1);
 #endif
         }
     }
 }
 
-template<typename FUNCTION> static void attempt (const FUNCTION & body)
+template <typename FUNCTION>
+static void attempt(const FUNCTION& body)
 {
     static const int retries = 5;
-    attempt<FUNCTION> (retries, body);
-    //msra::util::attempt<FUNCTION> (retries, body);
+    attempt<FUNCTION>(retries, body);
+    // msra::util::attempt<FUNCTION> (retries, body);
 }
 
 class File
 {
 private:
     std::wstring m_filename;
-    FILE* m_file;           // file handle
-    bool m_pcloseNeeded;    // was opened with popen(), use pclose() when destructing
-    bool m_seekable;        // this stream is seekable
-    int m_options;          // FileOptions ored togther
+    FILE* m_file;        // file handle
+    bool m_pcloseNeeded; // was opened with popen(), use pclose() when destructing
+    bool m_seekable;     // this stream is seekable
+    int m_options;       // FileOptions ored togther
     void Init(const wchar_t* filename, int fileOptions);
 
 public:
     File(const std::wstring& filename, int fileOptions);
-    File(const std::string& filename, int fileOptions);
+    File(const std::string&  filename, int fileOptions);
     File(const wchar_t* filename, int fileOptions);
-    ~File(void);
+    ~File();
 
     void Flush();
 
@@ -115,10 +117,11 @@ public:
 
     bool IsTextBased();
 
-    bool IsUnicodeBOM(bool skip=false);
+    bool IsUnicodeBOM(bool skip = false);
     bool IsEOF();
-    bool IsWhiteSpace(bool skip=false);
-    int EndOfLineOrEOF(bool skip=false);
+    bool IsWhiteSpace(bool skip = false);
+    int EndOfLineOrEOF(bool skip = false);
+
 
     // TryGetText - for text value, try and get a particular type
     // returns - true if value returned, otherwise false, can't parse
@@ -129,31 +132,40 @@ public:
         return !!ftrygetText(m_file, val);
     }
 
-    void GetLine(std::wstring& str);
     void GetLine(std::string& str);
     void GetLines(std::vector<std::wstring>& lines);
     void GetLines(std::vector<std::string>& lines);
+
+    // static helpers
+    // test whether a file exists
+    template<class String>
+    static bool Exists(const String& filename);
+
+    // make intermediate directories
+    template<class String>
+    static void MakeIntermediateDirs(const String& filename);
+
+    // determine the directory and naked file name for a given pathname
+    static std::wstring DirectoryPathOf(std::wstring path);
+    static std::wstring FileNameOf(std::wstring path);
+
+    // get path of current executable
+    static std::wstring GetExecutablePath();
 
     // put operator for basic types
     template <typename T>
     File& operator<<(T val)
     {
-#ifndef    __CUDACC__      // TODO: CUDA compiler blows up, fix this
-        attempt([=]()
-#endif
         {
             if (IsTextBased())
                 fputText(m_file, val);
             else
                 fput(m_file, val);
         }
-#ifndef    __CUDACC__
-        );
-#endif
         return *this;
     }
     File& operator<<(const std::wstring& val);
-    File& operator<<(const std::string& val);  
+    File& operator<<(const std::string& val);
     File& operator<<(FileMarker marker);
     File& PutMarker(FileMarker marker, size_t count);
     File& PutMarker(FileMarker marker, const std::string& section);
@@ -176,27 +188,19 @@ public:
     template <typename T>
     File& operator>>(T& val)
     {
-#ifndef    __CUDACC__      // TODO: CUDA compiler blows up, fix this
-        attempt([&]()
-#endif
-        {
-            if (IsTextBased())
-                fgetText(m_file, val);
-            else
-                fget(m_file, val);
-        }
-#ifndef    __CUDACC__
-        );
-#endif
+        if (IsTextBased())
+            fgetText(m_file, val);
+        else
+            fget(m_file, val);
         return *this;
     }
 
-    void WriteString(const char* str, int size=0); // zero terminated strings use size=0
-    void ReadString(char* str, int size);    // read up to size bytes, or a zero terminator (or space in text mode)
-    void WriteString(const wchar_t* str, int size=0); // zero terminated strings use size=0
-    void ReadString(wchar_t* str, int size);    // read up to size bytes, or a zero terminator (or space in text mode)
-    void ReadChars(std::string& val, size_t cnt, bool reset=false); // read a specified number of characters, and reset read pointer if requested
-    void ReadChars(std::wstring& val, size_t cnt, bool reset=false); // read a specified number of characters, and reset read pointer if requested
+    void WriteString(const char* str, int size = 0);                   // zero terminated strings use size=0
+    void ReadString(char* str, int size);                              // read up to size bytes, or a zero terminator (or space in text mode)
+    void WriteString(const wchar_t* str, int size = 0);                // zero terminated strings use size=0
+    void ReadString(wchar_t* str, int size);                           // read up to size bytes, or a zero terminator (or space in text mode)
+    void ReadChars(std::string& val, size_t cnt, bool reset = false);  // read a specified number of characters, and reset read pointer if requested
+    void ReadChars(std::wstring& val, size_t cnt, bool reset = false); // read a specified number of characters, and reset read pointer if requested
 
     File& operator>>(std::wstring& val);
     File& operator>>(std::string& val);
@@ -215,7 +219,7 @@ public:
     {
         T element;
         val.clear();
-        size_t size=0;
+        size_t size = 0;
         this->GetMarker(fileMarkerBeginList, size);
         if (size > 0)
         {
@@ -244,75 +248,41 @@ public:
         return *this;
     }
 
+    operator FILE*() const { return m_file; }
+
     // Read a matrix stored in text format from 'filePath' (whitespace-separated columns, newline-separated rows),
-    // and return a flat array containing the contents of this file in column-major format.
+    // and return a flat vector containing the contents of this file in column-major format.
     // filePath: path to file containing matrix in text format.
     // numRows/numCols: after this function is called, these parameters contain the number of rows/columns in the matrix.
     // returns: a flat array containing the contents of this file in column-major format
-    // NOTE: caller is responsible for deleting the returned buffer once it is finished using it.
-    // TODO: change to return a std::vector<ElemType>; solves the ownership issue
     // This function does not quite fit here, but it fits elsewhere even worse. TODO: change to use File class!
-    template<class ElemType>
-    static vector<ElemType> LoadMatrixFromTextFile(const std::string filePath, size_t& numRows, size_t& numCols)
+    template <class ElemType>
+    static vector<ElemType> LoadMatrixFromTextFile(const std::wstring& filePath, size_t& /*out*/ numRows, size_t& /*out*/ numCols);
+
+    // Read a label file.
+    // A label file is a sequence of text lines with one token per line, where each line maps a string to an index, starting with 0.
+    // This function allows spaces inside the word name, but trims surrounding spaces.
+    // TODO: Move this to class File, as this is similar in nature to LoadMatrixFromTextFile().
+    template <class LabelType>
+    static void LoadLabelFile(const std::wstring& filePath, std::vector<LabelType>& retLabels)
     {
-        size_t r = 0;
-        size_t numColsInFirstRow = 0;
+        File file(filePath, fileOptionsRead | fileOptionsText);
 
-        // NOTE: Not using the Microsoft.MSR.CNTK.File API here because it
-        // uses a buffer of fixed size, which doesn't allow very long rows.
-        // See fileutil.cpp fgetline method (std::string fgetline (FILE * f) { fixed_vector<char> buf (1000000); ... })
-        std::ifstream myfile(filePath);
-
-        // load matrix into vector of vectors (since we don't know the size in advance).
-        std::vector<std::vector<ElemType>> elements;
-        if (myfile.is_open())
+        LabelType str;
+        retLabels.clear();
+        while (!file.IsEOF())
         {
-            std::string line;
-            while (std::getline(myfile, line))
-            {
-                // Break on empty line.  This allows there to be an empty line at the end of the file.
-                if (line == "")
+            file.GetLine(str);
+            if (str.empty())
+                if (file.IsEOF())
                     break;
+                else
+                    RuntimeError("LoadLabelFile: Invalid empty line in label file.");
 
-                istringstream iss(line);
-                ElemType element;
-                int numElementsInRow = 0;
-                elements.push_back(std::vector<ElemType>());
-                while (iss >> element)
-                {
-                    elements[r].push_back(element);
-                    numElementsInRow++;
-                }
-
-                if (r == 0)
-                    numColsInFirstRow = numElementsInRow;
-                else if (numElementsInRow != numColsInFirstRow)
-                    RuntimeError("The rows in the provided file do not all have the same number of columns: %s", filePath.c_str());
-
-                r++;
-            }
-            myfile.close();
+            retLabels.push_back(trim(str));
         }
-        else
-            RuntimeError("Unable to open file");
-
-        numRows = r;
-        numCols = numColsInFirstRow;
-
-        vector<ElemType> array(numRows * numCols);
-
-        // Perform transpose when copying elements from vectors to ElemType[],
-        // in order to store in column-major format.
-        for (int i = 0; i < numCols; i++)
-        {
-            for (int j = 0; j < numRows; j++)
-                array[i * numRows + j] = elements[j][i];
-        }
-
-        return array;
     }
 
-    operator FILE*() const { return m_file; }
 };
 
 }}}

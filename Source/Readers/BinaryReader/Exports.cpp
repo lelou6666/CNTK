@@ -1,7 +1,6 @@
 //
-// <copyright file="Exports.cpp" company="Microsoft">
-//     Copyright (c) Microsoft Corporation.  All rights reserved.
-// </copyright>
+// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 //
 // Exports.cpp : Defines the exported functions for the DLL application.
 //
@@ -15,34 +14,22 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-template<class ElemType>
-void DATAREADER_API GetReader(IDataReader<ElemType>** preader)
+extern "C" DATAREADER_API void GetReaderF(IDataReader** preader)
 {
-    *preader = new BinaryReader<ElemType>();
+    *preader = new BinaryReader<float>();
+}
+extern "C" DATAREADER_API void GetReaderD(IDataReader** preader)
+{
+    *preader = new BinaryReader<double>();
 }
 
-extern "C" DATAREADER_API void GetReaderF(IDataReader<float>** preader)
+extern "C" DATAWRITER_API void GetWriterF(IDataWriter** pwriter)
 {
-    GetReader(preader);
+    *pwriter = new BinaryWriter<float>();
 }
-extern "C" DATAREADER_API void GetReaderD(IDataReader<double>** preader)
+extern "C" DATAWRITER_API void GetWriterD(IDataWriter** pwriter)
 {
-    GetReader(preader);
-}
-
-template<class ElemType>
-void DATAWRITER_API GetWriter(IDataWriter<ElemType>** pwriter)
-{
-    *pwriter = new BinaryWriter<ElemType>();
-}
-
-extern "C" DATAWRITER_API void GetWriterF(IDataWriter<float>** pwriter)
-{
-    GetWriter(pwriter);
-}
-extern "C" DATAWRITER_API void GetWriterD(IDataWriter<double>** pwriter)
-{
-    GetWriter(pwriter);
+    *pwriter = new BinaryWriter<double>();
 }
 
 }}}

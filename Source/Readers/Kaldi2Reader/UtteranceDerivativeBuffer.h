@@ -10,7 +10,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 // This class "gules" together the log-likelihood from different minibatches,
 // and then calls <UtteranceDerivativeComputationInterface> class to compute
 // the derivative for given utterance.
-template<class ElemType>
+template <class ElemType>
 class UtteranceDerivativeBuffer
 {
 private:
@@ -24,14 +24,15 @@ private:
         Matrix<ElemType> derivative;
         ElemType objective;
 
-        UtteranceDerivativeUnit() :
-            logLikelihood(CPUDEVICE), derivative(CPUDEVICE)
+        UtteranceDerivativeUnit()
+            : logLikelihood(CPUDEVICE), derivative(CPUDEVICE)
         {
             hasDerivative = false;
             uttLength = 0;
             progress = 0;
             streamID = 0;
         }
+
     };
 
     bool m_needLikelihood;
@@ -64,9 +65,14 @@ public:
         UtteranceDerivativeComputationInterface<ElemType>* derivativeInterface);
 
     // Destructor.
-    ~UtteranceDerivativeBuffer() {}
+    ~UtteranceDerivativeBuffer()
+    {
+    }
 
-    bool NeedLikelihoodToComputeDerivative() const { return m_needLikelihood; }
+    bool NeedLikelihoodToComputeDerivative() const
+    {
+        return m_needLikelihood;
+    }
 
     bool SetLikelihood(
         const std::vector<std::vector<std::pair<wstring, size_t>>>& uttInfo,
@@ -82,6 +88,7 @@ public:
     // Gets the computed objectives for given utterance.
     bool GetObjective(
         const std::vector<std::vector<std::pair<wstring, size_t>>>& uttInfo,
+        const MBLayoutPtr pMBLayout,
         Matrix<ElemType>* objectivesIn);
 
     bool HasResourceForDerivative(const wstring& uttID) const;
@@ -91,9 +98,12 @@ public:
         return (m_uttPool.find(uttID) != m_uttPool.end());
     }
 
-    void SetEpochEnd() { m_epochEnd = true; m_needLikelihood = false; }
+    void SetEpochEnd()
+    {
+        m_epochEnd = true;
+        m_needLikelihood = false;
+    }
 
     void ResetEpoch();
 };
-
-}}}
+} } }

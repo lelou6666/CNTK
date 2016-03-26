@@ -37,6 +37,9 @@
     <ClCompile Include="ComputationNetworkScripting.cpp">
       <Filter>Network</Filter>
     </ClCompile>
+    <ClCompile Include="ReshapingNodes.cpp">
+      <Filter>Nodes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Common\Include\fileutil.h">
@@ -65,15 +68,6 @@
     </ClInclude>
     <ClInclude Include="..\Common\Include\BestGpu.h">
       <Filter>Common\Include</Filter>
-    </ClInclude>
-    <ClInclude Include="CompositeComputationNodes.h">
-      <Filter>Nodes</Filter>
-    </ClInclude>
-    <ClInclude Include="EvaluationCriterionNodes.h">
-      <Filter>Nodes</Filter>
-    </ClInclude>
-    <ClInclude Include="TrainingCriterionNodes.h">
-      <Filter>Nodes</Filter>
     </ClInclude>
     <ClInclude Include="NonlinearityNodes.h">
       <Filter>Nodes</Filter>
@@ -114,14 +108,26 @@
     <ClInclude Include="..\Common\Include\Sequences.h">
       <Filter>Common\Include</Filter>
     </ClInclude>
-    <ClInclude Include="EsotericNodes.h">
-      <Filter>Nodes</Filter>
-    </ClInclude>
     <ClInclude Include="..\Common\Include\TensorShape.h">
       <Filter>Common\Include</Filter>
     </ClInclude>
     <ClInclude Include="..\Common\Include\Config.h">
       <Filter>Common\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="SpecialPurposeNodes.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="PreComputeNodes.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="EvaluationNodes.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="TrainingNodes.h">
+      <Filter>Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="ComputationEnvironment.h">
+      <Filter>Environment</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -145,6 +151,9 @@
     </Filter>
     <Filter Include="from Math">
       <UniqueIdentifier>{7d838fa4-b5a1-4b8a-b37d-823fb026055b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Environment">
+      <UniqueIdentifier>{ed685e39-b7dd-4546-a865-149664fa71a4}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

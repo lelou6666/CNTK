@@ -298,12 +298,12 @@ status open
 
 \begin_layout Plain Layout
 
-extern "C" DATAREADER_API void GetReaderF(IDataReader<float>** preader);
+extern "C" DATAREADER_API void GetReaderF(IDataReader** preader);
 \end_layout
 
 \begin_layout Plain Layout
 
-extern "C" DATAREADER_API void GetReaderD(IDataReader<double>** preader);
+extern "C" DATAREADER_API void GetReaderD(IDataReader** preader);
 \end_layout
 
 \end_inset
@@ -319,12 +319,12 @@ status open
 
 \begin_layout Plain Layout
 
-extern "C" DATAWRITER_API void GetWriterF(IDataWriter<float>** pwriter);
+extern "C" DATAWRITER_API void GetWriterF(IDataWriter** pwriter);
 \end_layout
 
 \begin_layout Plain Layout
 
-extern "C" DATAWRITER_API void GetWriterD(IDataWriter<double>** pwriter);
+extern "C" DATAWRITER_API void GetWriterD(IDataWriter** pwriter);
 \end_layout
 
 \end_inset
@@ -430,8 +430,7 @@ ochSamples=requestDataSize) = 0;
 
 \begin_layout Plain Layout
 
-    virtual bool GetMinibatch(std::map<std::wstring, Matrix<ElemType>*>&
- matrices) = 0;
+    virtual bool GetMinibatch(StreamMinibatchInputs& matrices) = 0;
 \end_layout
 
 \begin_layout Plain Layout
@@ -441,14 +440,13 @@ ochSamples=requestDataSize) = 0;
 
 \begin_layout Plain Layout
 
-  virtual const std::map<typename LabelIdType, typename LabelType>& GetLabelMapp
+  virtual const std::map<LabelIdType, LabelType>& GetLabelMapp
 ing(const std::wstring& sectionName) = 0;
 \end_layout
 
 \begin_layout Plain Layout
 
-  virtual void SetLabelMapping(const std::wstring& sectionName, const std::map<t
-ypename LabelIdType, typename LabelType>& labelMapping) = 0;
+  virtual void SetLabelMapping(const std::wstring& sectionName, const std::map<LabelIdType, LabelType>& labelMapping) = 0;
 \end_layout
 
 \begin_layout Plain Layout
@@ -464,7 +462,7 @@ ypename LabelIdType, typename LabelType>& labelMapping) = 0;
 
 \begin_layout Plain Layout
 
-    virtual bool DataEnd(EndDataType endDataType) = 0;
+    virtual bool DataEnd() = 0;
 \end_layout
 
 \begin_layout Plain Layout
@@ -1098,8 +1096,7 @@ public:
 
 \begin_layout Plain Layout
 
-   virtual void SaveMapping(std::wstring saveId, const std::map<typename
- LabelIdType, typename LabelType>& labelMapping) = 0;
+   virtual void SaveMapping(std::wstring saveId, const std::map<LabelIdType, LabelType>& labelMapping) = 0;
 \end_layout
 
 \begin_layout Plain Layout
@@ -2330,7 +2327,7 @@ void DoCommand(const ConfigParameters& config)
 
 \begin_layout Plain Layout
 
-        //get the configuration parameters that match the command
+        // get the configuration parameters that match the command
 \end_layout
 
 \begin_layout Plain Layout
@@ -3139,11 +3136,6 @@ virtual void Validate()
 
 \begin_layout Plain Layout
 
-    PrintSelfBeforeValidation();
-\end_layout
-
-\begin_layout Plain Layout
-
             
 \end_layout
 
@@ -3186,7 +3178,7 @@ s().GetNumCols() != 1)
 
 \begin_layout Plain Layout
 
-        throw std::logic_error("The left value of ScaleNode must be a scarlar
+        throw std::logic_error("The left value of ScaleNode must be a scalar
  value.");
 \end_layout
 
@@ -3207,7 +3199,7 @@ unctionValues().GetNumCols());
 
 \begin_layout Plain Layout
 
-    //left Node must be a scalar             
+    // left Node must be a scalar             
 \end_layout
 
 \begin_layout Plain Layout
@@ -3420,12 +3412,12 @@ virtual void BackpropTo(const size_t inputIndex)
 
 \begin_layout Plain Layout
 
-    //left Node must be a scalar             
+    // left Node must be a scalar             
 \end_layout
 
 \begin_layout Plain Layout
 
-    if (inputIndex == 0)  //left derivative
+    if (inputIndex == 0)  // left derivative
 \end_layout
 
 \begin_layout Plain Layout
@@ -3504,12 +3496,12 @@ Seq)
 
 \begin_layout Plain Layout
 
-    //left Node must be a scalar             
+    // left Node must be a scalar             
 \end_layout
 
 \begin_layout Plain Layout
 
-    if (inputIndex == 0)  //left derivative             
+    if (inputIndex == 0)  // left derivative             
 \end_layout
 
 \begin_layout Plain Layout
@@ -3863,7 +3855,7 @@ ComputationNodePtr CreateComputationNode(const std::wstring nodeType, const
 
 \begin_layout Plain Layout
 
-    //other node types
+    // other node types
 \end_layout
 
 \begin_layout Plain Layout
@@ -3927,7 +3919,7 @@ ComputationNode<ElemType>* CreateNodeFromFile(const std::wstring nodeType,
 
 \begin_layout Plain Layout
 
-    //other node types
+    // other node types
 \end_layout
 
 \begin_layout Plain Layout
@@ -3943,7 +3935,7 @@ ComputationNode<ElemType>* CreateNodeFromFile(const std::wstring nodeType,
 
 \begin_layout Plain Layout
 
-    //other node types
+    // other node types
 \end_layout
 
 \begin_layout Plain Layout
@@ -4103,7 +4095,7 @@ bool CheckFunction(std::string& p_nodeType, bool* allowUndeterminedVariable)
 
 \begin_layout Plain Layout
 
-    //other node types    
+    // other node types    
 \end_layout
 
 \begin_layout Plain Layout
@@ -4118,7 +4110,7 @@ bool CheckFunction(std::string& p_nodeType, bool* allowUndeterminedVariable)
 
 \begin_layout Plain Layout
 
-    //other node types and codes
+    // other node types and codes
 \end_layout
 
 \begin_layout Plain Layout
@@ -4148,7 +4140,7 @@ virtual void Evaluate(NDLNode<ElemType>* node, const wstring& baseName,
 
 \end_inset
 
-function in the SynchronousExecutionEngine.h file to handle special parameters.
+function in the NDLNetworkBuilder.h file to handle special parameters.
  
 \end_layout
 
@@ -4391,7 +4383,7 @@ std::vector<ComputationNodePtr> & labelNodes = net.LabelNodes();
 
 \begin_layout Plain Layout
 
-std::map<std::wstring, Matrix<ElemType>*> inputMatrices; 
+StreamMinibatchInputs inputMatrices; 
 \end_layout
 
 \begin_layout Plain Layout
@@ -4632,7 +4624,7 @@ while (trainSetDataReader->GetMinibatch(inputMatrices))
 
 \begin_layout Plain Layout
 
-    //update the time stamp of the input nodes for re-evaluation
+    // update the time stamp of the input nodes for re-evaluation
 \end_layout
 
 \begin_layout Plain Layout

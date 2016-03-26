@@ -1,31 +1,34 @@
 //
-// <copyright file="Exports.cpp" company="Microsoft">
-//     Copyright (c) Microsoft Corporation.  All rights reserved.
-// </copyright>
+// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 //
 // Exports.cpp : Defines the exported functions for the DLL application.
 //
 
 #include "stdafx.h"
 #define DATAREADER_EXPORTS
-#include "DataReader.h"
+#define DATAWRITER_EXPORTS
 #include "SequenceReader.h"
+#include "SequenceWriter.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-template<class ElemType>
-void DATAREADER_API GetReader(IDataReader<ElemType>** preader)
+extern "C" DATAREADER_API void GetReaderF(IDataReader** preader)
 {
-    *preader = new BatchSequenceReader<ElemType>();
+    *preader = new BatchSequenceReader<float>();
+}
+extern "C" DATAREADER_API void GetReaderD(IDataReader** preader)
+{
+    *preader = new BatchSequenceReader<double>();
 }
 
-extern "C" DATAREADER_API void GetReaderF(IDataReader<float>** preader)
+extern "C" DATAWRITER_API void GetWriterF(IDataWriter** pwriter)
 {
-    GetReader(preader);
+    *pwriter = new LMSequenceWriter<float>();
 }
-extern "C" DATAREADER_API void GetReaderD(IDataReader<double>** preader)
+extern "C" DATAWRITER_API void GetWriterD(IDataWriter** pwriter)
 {
-    GetReader(preader);
+    *pwriter = new LMSequenceWriter<double>();
 }
 
 }}}
